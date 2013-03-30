@@ -12,6 +12,7 @@ var worldHash = {};
   var gatesWidth = 5 * sizeUnit;
   var gatesHeight = 33 * sizeUnit;
   var worldCoeff = 0.01;  // Try scaling the world by this factor.
+  var minDist = (puckRadius + malletRadius) * worldCoeff;
 
 var createWorld = function(roomId, callback) {
   var thisWorld = {};
@@ -116,29 +117,39 @@ var updateScore = function(roomId) {
 };
 
 var updatePuck = function(roomId) {
-  worldHash[roomId].puckBody.SetLinearVelocity(new b2Vec2(worldHash[roomId].puckBody.m_linearVelocity.x * 0.995, worldHash[roomId].puckBody.m_linearVelocity.y * 0.995));
-  if ( worldHash[roomId].puckBody.m_linearVelocity.y <= 0.1 ){
-    if ( worldHash[roomId].puckBody.GetPosition().y <= puckRadius * 1.1 * worldCoeff ){
-      worldHash[roomId].puckBody.SetLinearVelocity( new b2Vec2( worldHash[roomId].puckBody.m_linearVelocity.x, 0.3 ) );
+  
+  var closeToBottom = worldHash[roomId].puckBody.GetPosition().y >= (height - puckRadius * 1.05) * worldCoeff;
+  var closeToTop = worldHash[roomId].puckBody.GetPosition().y <= puckRadius * 1.05 * worldCoeff;
+  var closeToLeft = worldHash[roomId].puckBody.GetPosition().x <= (gatesWidth + puckRadius) * 1.05 * worldCoeff;
+  var closeToRight = worldHash[roomId].puckBody.GetPosition().x >= (width - gatesWidth - puckRadius * 1.05) * worldCoeff;
+
+  if ( ( worldHash[roomId].puckBody.m_linearVelocity.y <= 0.1 && ( closeToTop || closeToBottom ) ) ||
+       ( worldHash[roomId].puckBody.m_linearVelocity.x <= 0.1 && ( closeToLeft || closeToRight ) ) ) {
+
+    var xDiff1 = Math.abs( worldHash[roomId].puckBody.GetPosition().x - worldHash[roomId].mallet1Body.GetPosition().x );
+    var yDiff1 = Math.abs( worldHash[roomId].puckBody.GetPosition().y - worldHash[roomId].mallet1Body.GetPosition().y );
+    var xDiff2 = Math.abs( worldHash[roomId].puckBody.GetPosition().x - worldHash[roomId].mallet2Body.GetPosition().x );
+    var yDiff2 = Math.abs( worldHash[roomId].puckBody.GetPosition().y - worldHash[roomId].mallet2Body.GetPosition().y );
+
+    var diff1 = Math.sqrt( Math.pow(xDiff1, 2) + Math.pow(yDiff1, 2) );
+    var diff2 = Math.sqrt( Math.pow(xDiff2, 2) + Math.pow(yDiff2, 2) );
+
+    if ( minDist * 1.05 > diff1 ){
+      worldHash[roomId].puckBody.SetLinearVelocity(new b2Vec2(worldHash[roomId].mallet1Body.m_linearVelocity.x * (-0.3), worldHash[roomId].mallet1Body.m_linearVelocity.y * (-0.3)));
     }
-    if ( worldHash[roomId].puckBody.GetPosition().y >= (height - puckRadius * 1.1) * worldCoeff ){
-      worldHash[roomId].puckBody.SetLinearVelocity( new b2Vec2( worldHash[roomId].puckBody.m_linearVelocity.x, - 0.3) );
+    if ( minDist * 1.05 > diff2 ){
+      worldHash[roomId].puckBody.SetLinearVelocity(new b2Vec2(worldHash[roomId].mallet2Body.m_linearVelocity.x * (-0.3), worldHash[roomId].mallet2Body.m_linearVelocity.y * (-0.3)));
     }
-  }
-  if ( worldHash[roomId].puckBody.m_linearVelocity.x <= 0.1 ){
-    if ( worldHash[roomId].puckBody.GetPosition().x <= (gatesWidth + puckRadius) * 1.1 * worldCoeff ){
-      worldHash[roomId].puckBody.SetLinearVelocity( new b2Vec2( 0.3, worldHash[roomId].puckBody.m_linearVelocity.y ) );
-    }
-    if ( worldHash[roomId].puckBody.GetPosition().x >= (width - gatesWidth - puckRadius * 1.1) * worldCoeff ){
-      worldHash[roomId].puckBody.SetLinearVelocity( new b2Vec2( -0.3, worldHash[roomId].puckBody.m_linearVelocity.y ) );
-    }
-  }
+  } else {
+    worldHash[roomId].puckBody.SetLinearVelocity(new b2Vec2(worldHash[roomId].puckBody.m_linearVelocity.x * 0.995, worldHash[roomId].puckBody.m_linearVelocity.y * 0.995));
+  } 
 };
 
  var updateFunc = function(roomId) {
     var roomId = roomId;
     var func = function() {
       updateScore(roomId);
+      updatePuck(roomId);
       worldHash[roomId].world.Step(1 / 60, 10, 10);
       worldHash[roomId].world.ClearForces();
     };
